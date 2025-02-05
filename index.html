@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>arXiv Reels</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; overflow: hidden; }
+        .container { display: flex; flex-direction: column; align-items: center; height: 100vh; }
+        .reel { width: 90vw; height: 80vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; border: 1px solid #ccc; border-radius: 10px; padding: 20px; margin: 10px; }
+        .reel img { width: 80%; height: 60%; object-fit: contain; border-radius: 10px; background: #f4f4f4; }
+        .controls { display: flex; gap: 10px; margin-top: 10px; }
+        .controls button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="reel-container" class="reel">
+            <img id="reel-image" src="" alt="arXiv Thumbnail">
+            <h2 id="reel-title"></h2>
+            <p id="reel-description"></p>
+        </div>
+        <div class="controls" id="controls">
+            <button onclick="prevReel()">Previous</button>
+            <button onclick="nextReel()">Next</button>
+        </div>
+    </div>
+    <script>
+        let reels = [];
+        let currentIndex = -1;
+
+        async function fetchReel() {
+            let randomStart = Math.floor(Math.random() * 10000);
+            let url = `https://export.arxiv.org/api/query?search_query=all&start=${randomStart}&max_results=1`;
+            let response = await fetch(url);
+            let text = await response.text();
+            let parser = new DOMParser();
+            let xml = parser.parseFromString(text, "text/xml");
+            
+            let entry = xml.getElementsByTagName("entry")[0];
+            if (entry) {
+                let paperId = entry.getElementsByTagName("id")[0].textContent.split('/').pop();
+                let reel = {
+                    title: entry.getElementsByTagName("title")[0].textContent,
+                    description: entry.getElementsByTagName("summary")[0].textContent,
+                    image: `https://arxiv.org/pdf/${paperId}.pdf#thumbnail`,
+                    pdf: `https://arxiv.org/pdf/${paperId}.pdf`
+                };
+                reels.push(reel);
+                currentIndex++;
+                displayReel();
+            }
+        }
+
+        function displayReel() {
+            if (reels.length === 0) return;
+            let reel = reels[currentIndex];
+            document.getElementById("reel-image").src = reel.image;
+            document.getElementById("reel-title").textContent = reel.title;
+            document.getElementById("reel-description").textContent = reel.description;
+        }
+
+        function nextReel() {
+            if (currentIndex < reels.length - 1) {
+                currentIndex++;
+                displayReel();
+            } else {
+                fetchReel();
+            }
+        }
+
+        function prevReel() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                displayReel();
+            }
+        }
+
+        function detectDevice() {
+            if (/Mobi|Android/i.test(navigator.userAgent)) {
+                document.getElementById("controls").style.display = "none";
+                document.addEventListener("touchstart", handleTouch);
+            }
+        }
+
+        let touchStartY = 0;
+        function handleTouch(event) {
+            if (event.touches.length > 0) {
+                let touch = event.touches[0];
+                touchStartY = touch.clientY;
+                document.addEventListener("touchend", handleTouchEnd);
+            }
+        }
+        
+        function handleTouchEnd(event) {
+            let touchEndY = event.changedTouches[0].clientY;
+            if (touchStartY - touchEndY > 50) nextReel();
+            if (touchStartY - touchEndY < -50) prevReel();
+            document.removeEventListener("touchend", handleTouchEnd);
+        }
+
+        detectDevice();
+        fetchReel();
+    </script>
+</body>
+</html>
